@@ -1,9 +1,10 @@
 package schema_test
 
 import (
+	"testing"
+
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"testing"
 )
 
 func TestNamerPreloadRegression(t *testing.T) {
@@ -20,7 +21,10 @@ func TestNamerPreloadRegression(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sqlDB, _ := db.DB()
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer sqlDB.Close()
 	for _, query := range []string{
 		"CREATE TABLE companies (company_id integer PRIMARY KEY, name text)",
@@ -49,7 +53,10 @@ func TestNamerReturnedColumnScan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sqlDB, _ := db.DB()
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer sqlDB.Close()
 	var record Record
 	if err := db.Raw("SELECT 'oracle-compatible' AS value").Scan(&record).Error; err != nil {
