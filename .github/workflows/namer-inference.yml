@@ -1,0 +1,34 @@
+name: Namer inference investigation
+on:
+  push:
+    branches: [investigate/7619-namer-inference]
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: candidate
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.1'
+      - name: Compare immediate parent, merge, and current upstream
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone https://github.com/go-gorm/gorm.git upstream
+          for ref in 5eaf05a a57abbe b3d3bf219f0283f8e2e985bac509cb643170f729; do
+            git -C upstream checkout --detach "$ref"
+            cp candidate/schema/namer_relationship_test.go upstream/schema/
+            (cd upstream && GORM_INFERENCE_OBSERVE=1 go test -count=1 -v ./schema -run '^TestNamerRelationshipInference$') > "$ref.log"
+            cat "$ref.log"
+          done
+      - name: Current upstream root suite
+        run: cd upstream && GORM_INFERENCE_OBSERVE=1 go test -race -count=1 ./...
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: inference-results
+          path: '*.log'
