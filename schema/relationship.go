@@ -463,6 +463,7 @@ func (schema *Schema) guessRelation(relation *Relationship, field *Field, cgl gu
 	}
 }
 
+//nolint:cyclop // Preserve the existing inference algorithm and retry order while parameterizing field lookup.
 func (schema *Schema) guessRelationWithLookup(relation *Relationship, field *Field, cgl guessLevel, lookup func(*Schema, string) *Field) {
 	var (
 		primaryFields, foreignFields []*Field

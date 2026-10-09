@@ -25,7 +25,11 @@ func TestNamerPreloadRegression(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer sqlDB.Close()
+	t.Cleanup(func() {
+		if err := sqlDB.Close(); err != nil {
+			t.Errorf("close database: %v", err)
+		}
+	})
 	for _, query := range []string{
 		"CREATE TABLE companies (company_id integer PRIMARY KEY, name text)",
 		"CREATE TABLE users (id integer PRIMARY KEY, company_id integer)",
@@ -57,7 +61,11 @@ func TestNamerReturnedColumnScan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer sqlDB.Close()
+	t.Cleanup(func() {
+		if err := sqlDB.Close(); err != nil {
+			t.Errorf("close database: %v", err)
+		}
+	})
 	var record Record
 	if err := db.Raw("SELECT 'oracle-compatible' AS value").Scan(&record).Error; err != nil {
 		t.Fatal(err)

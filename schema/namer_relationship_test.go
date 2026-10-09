@@ -116,43 +116,7 @@ func TestNamerRelationshipInference(t *testing.T) {
 	for _, n := range namers {
 		for _, c := range cases {
 			t.Run(n.name+"/"+c.name, func(t *testing.T) {
-				wantErr := (c.name == "database-name-tags" && n.name == "no-lower-case") ||
-					(c.name == "namer-only-tags" && (n.name == "no-lower-case" || n.name == "replacer"))
-				s, err := schema.Parse(c.model, &sync.Map{}, n.namer)
-				if wantErr {
-					if err == nil {
-						t.Fatal("expected invalid relationship to remain invalid")
-					}
-					return
-				}
-				if err != nil {
-					t.Fatal(err)
-				}
-				rel := s.Relationships.Relations["Company"]
-				if rel == nil || len(rel.References) != 1 {
-					t.Fatalf("unexpected relation: %#v", rel)
-				}
-				r := rel.References[0]
-				t.Logf("type=%s primary=%s.%s foreign=%s.%s own=%t", rel.Type, r.PrimaryKey.Schema.Name, r.PrimaryKey.Name, r.ForeignKey.Schema.Name, r.ForeignKey.Name, r.OwnPrimaryKey)
-				want, foreign := c.want, c.foreign
-				if c.name == "conventional-column-collision" && (n.name == "default" || n.name == "table-prefix" || n.name == "replacer") {
-					want, foreign = schema.HasOne, "ID"
-				}
-				if rel.Type != want || r.ForeignKey.Name != foreign {
-					t.Fatalf("got %s foreign %s; want %s foreign %s", rel.Type, r.ForeignKey.Name, want, foreign)
-				}
-				primary := "ID"
-				if c.name == "references-disambiguates" || c.name == "conventional-non-ID-column-collision" {
-					primary = "Code"
-				}
-				primarySchema, foreignSchema := rel.FieldSchema, s
-				own := want == schema.HasOne
-				if own {
-					primarySchema, foreignSchema = s, rel.FieldSchema
-				}
-				if r.PrimaryKey.Name != primary || r.PrimaryKey.Schema != primarySchema || r.ForeignKey.Schema != foreignSchema || r.OwnPrimaryKey != own {
-					t.Fatalf("incorrect reference ownership: %#v", r)
-				}
+				checkNamerRelationship(t, c.name, n.name, c.model, n.namer, c.want, c.foreign)
 			})
 		}
 	}
@@ -175,4 +139,59 @@ func TestNamerLookupOracleCompatibility(t *testing.T) {
 	if s.LookUpField("missing") != nil {
 		t.Fatal("unexpected missing field")
 	}
+}
+
+func checkNamerRelationship(t *testing.T, caseName, namerName string, model interface{}, namer schema.Namer, want schema.RelationshipType, foreign string) {
+	t.Helper()
+	wantErr := namerRelationshipWantError(caseName, namerName)
+	s, err := schema.Parse(model, &sync.Map{}, namer)
+	if wantErr {
+		if err == nil {
+			t.Fatal("expected invalid relationship to remain invalid")
+		}
+		return
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	rel := s.Relationships.Relations["Company"]
+	if rel == nil || len(rel.References) != 1 {
+		t.Fatalf("unexpected relation: %#v", rel)
+	}
+	r := rel.References[0]
+	t.Logf("type=%s primary=%s.%s foreign=%s.%s own=%t", rel.Type, r.PrimaryKey.Schema.Name, r.PrimaryKey.Name, r.ForeignKey.Schema.Name, r.ForeignKey.Name, r.OwnPrimaryKey)
+	want, foreign = namerRelationshipExpectation(caseName, namerName, want, foreign)
+	if rel.Type != want || r.ForeignKey.Name != foreign {
+		t.Fatalf("got %s foreign %s; want %s foreign %s", rel.Type, r.ForeignKey.Name, want, foreign)
+	}
+	checkNamerReferenceOwnership(t, caseName, s, rel, want)
+}
+
+func checkNamerReferenceOwnership(t *testing.T, caseName string, s *schema.Schema, rel *schema.Relationship, want schema.RelationshipType) {
+	t.Helper()
+	r := rel.References[0]
+	primary := "ID"
+	if caseName == "references-disambiguates" || caseName == "conventional-non-ID-column-collision" {
+		primary = "Code"
+	}
+	primarySchema, foreignSchema := rel.FieldSchema, s
+	own := want == schema.HasOne
+	if own {
+		primarySchema, foreignSchema = s, rel.FieldSchema
+	}
+	if r.PrimaryKey.Name != primary || r.PrimaryKey.Schema != primarySchema || r.ForeignKey.Schema != foreignSchema || r.OwnPrimaryKey != own {
+		t.Fatalf("incorrect reference ownership: %#v", r)
+	}
+}
+
+func namerRelationshipWantError(caseName, namerName string) bool {
+	return (caseName == "database-name-tags" && namerName == "no-lower-case") ||
+		(caseName == "namer-only-tags" && (namerName == "no-lower-case" || namerName == "replacer"))
+}
+
+func namerRelationshipExpectation(caseName, namerName string, want schema.RelationshipType, foreign string) (schema.RelationshipType, string) {
+	if caseName == "conventional-column-collision" && (namerName == "default" || namerName == "table-prefix" || namerName == "replacer") {
+		return schema.HasOne, "ID"
+	}
+	return want, foreign
 }
